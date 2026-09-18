@@ -21,6 +21,9 @@ final class ScreenStreamer {
     private static let minBitrate = 100_000
     private static let maxBitrate = 10_000_000
 
+    // matches maxAvcControlMessageSize in mobilecli; real payloads are ~100 bytes.
+    private static let maxControlMessageSize = 1 << 20
+
     private let h264Encoder: H264Encoder
     private let tcpServer: TCPServer
     private let audioEncoder: OpusAudioEncoder
@@ -100,12 +103,23 @@ final class ScreenStreamer {
         messageBuffer.append(data)
 
         while messageBuffer.count >= 4 {
-            let lengthBytes = messageBuffer.prefix(4)
-            let length = Int(UInt32(bigEndian: lengthBytes.withUnsafeBytes { $0.load(as: UInt32.self) }))
+            let length = messageBuffer.prefix(4).reduce(0) { ($0 << 8) | Int($1) }
+
+            // a length this large means the stream is out of sync; drop it
+            // rather than buffer forever waiting for bytes that never come.
+            guard length <= Self.maxControlMessageSize else {
+                NSLog("[ScreenStreamer] Dropping control buffer, bad message length %d", length)
+                messageBuffer.removeAll()
+                break
+            }
 
             guard messageBuffer.count >= 4 + length else { break }
 
-            let messageData = messageBuffer.subdata(in: 4..<(4 + length))
+            // Data keeps its indices after removeFirst, so once a message has
+            // been consumed the buffer no longer starts at 0. Index relative
+            // to startIndex or subdata traps on the next coalesced message.
+            let bodyStart = messageBuffer.startIndex + 4
+            let messageData = messageBuffer.subdata(in: bodyStart..<(bodyStart + length))
             messageBuffer.removeFirst(4 + length)
 
             handleJSONRPC(messageData)
