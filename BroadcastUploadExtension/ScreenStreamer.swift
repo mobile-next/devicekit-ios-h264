@@ -32,6 +32,7 @@ final class ScreenStreamer {
     private var messageBuffer = Data()
     private var isPaused = false
     private var isStopped = false
+    var onStopped: (() -> Void)?
     private var loggedMissingAudioClient = false
 
     init(
@@ -93,13 +94,13 @@ final class ScreenStreamer {
             audioServer.stop()
         }
 
-        tcpServer.messageHandler = { [weak self] data in
+        tcpServer.messageHandler = { [weak self] data, reply in
             guard let self else { return }
-            self.handleIncomingData(data)
+            self.handleIncomingData(data, reply: reply)
         }
     }
 
-    private func handleIncomingData(_ data: Data) {
+    private func handleIncomingData(_ data: Data, reply: @escaping (Data) -> Void) {
         messageBuffer.append(data)
 
         while messageBuffer.count >= 4 {
@@ -122,11 +123,11 @@ final class ScreenStreamer {
             let messageData = messageBuffer.subdata(in: bodyStart..<(bodyStart + length))
             messageBuffer.removeFirst(4 + length)
 
-            handleJSONRPC(messageData)
+            handleJSONRPC(messageData, reply: reply)
         }
     }
 
-    private func handleJSONRPC(_ data: Data) {
+    private func handleJSONRPC(_ data: Data, reply: @escaping (Data) -> Void) {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let method = json["method"] as? String else {
             print("[ScreenStreamer] Invalid JSON-RPC message")
@@ -144,10 +145,25 @@ final class ScreenStreamer {
         case "screencapture.resume":
             handleResume()
         case "screencapture.stop":
+            sendAck(id: json["id"], reply: reply)
             handleStop()
         default:
             print("[ScreenStreamer] Unknown method: \(method)")
         }
+    }
+
+    private func sendAck(id: Any?, reply: (Data) -> Void) {
+        let response: [String: Any] = [
+            "jsonrpc": "2.0",
+            "result": ["success": true],
+            "id": id ?? NSNull(),
+        ]
+        guard let payload = try? JSONSerialization.data(withJSONObject: response) else { return }
+
+        var length = UInt32(payload.count).bigEndian
+        var message = Data(bytes: &length, count: 4)
+        message.append(payload)
+        reply(message)
     }
 
     // Same method name, param, and clamp behavior as devicekit-android's
@@ -219,11 +235,13 @@ final class ScreenStreamer {
     }
 
     func stop() {
+        guard !isStopped else { return }
         isStopped = true
         tcpServer.stop()
         h264Encoder.invalidateCompressionSession()
         audioServer.stop()
         audioEncoder.invalidate()
+        onStopped?()
     }
 
     private func lengthPrefixed(_ data: Data) -> Data {
