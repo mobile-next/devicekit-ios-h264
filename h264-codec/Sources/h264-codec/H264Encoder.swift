@@ -84,6 +84,10 @@ public final class H264Encoder: NSObject {
             // see backend PR #378) — a Baseline encoder under a High-profile SDP
             // declaration is a real decoder-side mismatch, not just a label.
             kVTCompressionPropertyKey_ProfileLevel: kVTProfileLevel_H264_High_AutoLevel,
+            // High profile turns B-frames on by default. a live stream must not
+            // reorder: it adds latency, WebRTC H.264 assumes decode order ==
+            // presentation order, and the timing SEI pts would go backwards.
+            kVTCompressionPropertyKey_AllowFrameReordering: false,
             kVTCompressionPropertyKey_MaxKeyFrameInterval: config.expectedFrameRate,
             kVTCompressionPropertyKey_ExpectedFrameRate: config.expectedFrameRate,
             kVTCompressionPropertyKey_AverageBitRate: config.averageBitRate,
