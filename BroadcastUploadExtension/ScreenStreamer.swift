@@ -156,7 +156,7 @@ final class ScreenStreamer {
         let response: [String: Any] = [
             "jsonrpc": "2.0",
             "result": ["success": true],
-            "id": id ?? NSNull(),
+            "id": id ?? NSNull()
         ]
         guard let payload = try? JSONSerialization.data(withJSONObject: response) else { return }
 
