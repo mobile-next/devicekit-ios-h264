@@ -70,7 +70,7 @@ Connect to those ports and read the stream. No handshake needed — data starts 
 | `scaleFactor` | 0.5 | Resolution scale (50% of screen) |
 | `qualityFactor` | 0.8 | Ignored: setting VideoToolbox `Quality` disables bitrate control, so the encoder follows `averageBitRate` instead |
 | `expectedFrameRate` | 30 | Target frame rate |
-| `averageBitRate` | 8,000,000 | Video bitrate (bps) |
+| `averageBitRate` | 5,000,000 | Video bitrate (bps) |
 | `audioBitRate` | 64,000 | Audio bitrate (bps) |
 
 All parameters can be overridden via `setupInfo` when starting the broadcast.
