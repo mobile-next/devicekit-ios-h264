@@ -92,8 +92,10 @@ public final class H264Encoder: NSObject {
             kVTCompressionPropertyKey_ExpectedFrameRate: config.expectedFrameRate,
             kVTCompressionPropertyKey_AverageBitRate: config.averageBitRate,
             kVTCompressionPropertyKey_RealTime: config.isRealTime,
-            kVTCompressionPropertyKey_MaximizePowerEfficiency: true,
-            kVTCompressionPropertyKey_Quality: config.quality
+            // kVTCompressionPropertyKey_Quality is deliberately not set: with it
+            // VideoToolbox runs constant-quality and ignores AverageBitRate, so
+            // live setBitrate (WebRTC congestion control) had no effect at all.
+            kVTCompressionPropertyKey_MaximizePowerEfficiency: true
         ] as CFDictionary
 
         guard VTSessionSetProperties(session, propertyDictionary: propertyDictionary) == noErr else {
